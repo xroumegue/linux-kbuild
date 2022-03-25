@@ -212,7 +212,8 @@ do
             do_install
             ;;
         *)
-            echo "$CMD not supported"
+            echo "Running $CMD..."
+            make "${KARGS[@]}" "$CMD"
             ;;
     esac
 done
