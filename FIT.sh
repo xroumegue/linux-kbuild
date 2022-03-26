@@ -6,7 +6,7 @@ fi
 
 make_FIT_image() {
 	local kernel_compression
-	local kernel_its=$output_dir/arch/$arch/boot/kernel_fdt.its
+	local kernel_its=${1:-$output_dir/arch/$arch/boot/kernel_fdt.its}
 
 	case $image_kernel in
 	*.gz)
