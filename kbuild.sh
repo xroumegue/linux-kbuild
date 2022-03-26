@@ -17,6 +17,8 @@ cat << EOF
             This help message
         --verbose, -v
             Show build commands
+        --output-dir, -O
+            Specify the output directory
         --nfs-dir, -N
             Specify the NFS directory exporting the root file system
         --sysroot-dir, -S
@@ -38,8 +40,8 @@ cat << EOF
 EOF
 }
 
-opts_short=vhN:T:M:K:S:f:C:c:p:
-opts_long=verbose,help,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:
+opts_short=vhN:T:M:K:S:f:C:c:p:O:
+opts_long=verbose,help,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,output-dir:
 
 options=$(getopt -o ${opts_short} -l ${opts_long} -- "$@" )
 
@@ -59,6 +61,10 @@ while true; do
         --help | -h)
             usage
             exit 0
+            ;;
+        --output-dir | -O)
+            shift
+            output_dir=$1
             ;;
         --nfs-dir | -N)
             shift
@@ -116,6 +122,7 @@ arch=${arch:-arm64}
 kdir=${kdir:-$(pwd)}
 configs_dir=${configs_dir:-arch/${arch}/configs}
 v="${v:-0}"
+output_dir=${output_dir:-${kdir}}
 
 declare -a kargs
 kargs+=(-C "${kdir}")
@@ -134,16 +141,22 @@ else
     kargs+=(CROSS_COMPILE="${cross_compile}")
 fi
 
+if [ ${output_dir} != ${kdir} ];
+then
+    [ -d ${output_dir} ] || mkdir -p ${output_dir}
+    kargs+=(O="${output_dir}")
+fi
+
 [ -d "${nfs_dir}" ] || fatal "${nfs_dir} does not exist!"
 [ -d "${tftp_dir}" ] || fatal "${tftp_dir} does not exist!"
 
 function do_config {
     force=${1:-notforce}
-    if [ ! -e .config ] || [ "${force}" == "force" ];
+    if [ ! -e ${output_dir}/.config ] || [ "${force}" == "force" ];
     then
         if [ ${#fragments[@]} -gt 0 ];
         then
-            "${kdir}"/scripts/kconfig/merge_config.sh -m "arch/${arch}/configs/${defconfig}" "$(printf "${configs_dir}/%s " "${fragments[@]}")"
+            "${kdir}"/scripts/kconfig/merge_config.sh -O ${output_dir} -m "arch/${arch}/configs/${defconfig}" "$(printf "${configs_dir}/%s " "${fragments[@]}")"
             make "${kargs[@]}" olddefconfig
         else
             make "${kargs[@]}" "${defconfig}"
@@ -178,14 +191,14 @@ function do_install {
     echo "Copying ${platform}  dtbs, Image to ${tftp_dir}"
 
     find \
-        "arch/${arch}/boot/dts" \
+        "${output_dir}/arch/${arch}/boot/dts" \
         -iname "${platform}*.dtb" \
         -exec bash -c 'F=${1##*/}; cp $1 $2/${F/-overlay.dtb/.dtbo}' - '{}' "${tftp_dir}" \;
 
-    cp "arch/${arch}/boot/Image" "$tftp_dir/"
+    cp "${output_dir}/arch/${arch}/boot/Image" "$tftp_dir/"
 
     if [ -d "${sysroot_dir}" ]; then
-        sudo make "${kargs[@]}"  headers_install
+        ${sudo} make "${kargs[@]}"  headers_install
     fi
 }
 
