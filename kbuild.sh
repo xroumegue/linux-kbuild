@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: GPL-3.0
 
-set -ex
+set -e
 
 root_dir=$(dirname "$(realpath "$0")")
 
@@ -40,8 +40,8 @@ cat << EOF
 EOF
 }
 
-opts_short=vhN:T:M:K:S:f:C:c:p:O:
-opts_long=verbose,help,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,output-dir:
+opts_short=vhN:T:M:K:S:f:C:c:p:O:o:
+opts_long=verbose,help,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,output-dir:,overlays:
 
 options=$(getopt -o ${opts_short} -l ${opts_long} -- "$@" )
 
@@ -95,6 +95,10 @@ while true; do
             shift
             IFS=',' read -r -a fragments <<< "$1"
             unset IFS
+            ;;
+        --overlays | -o)
+            shift
+            IFS=',' read -r -a overlays <<< "$1"
             ;;
         --platform | -p)
             shift
@@ -212,6 +216,7 @@ function do_install_tftp {
 	kernel_its=$output_dir/arch/$arch/boot/kernel_fdt.its
     kernel_itb=${kernel_its/its/itb}
     eval make_FIT_image "$kernel_its"
+    eval make_FIT_boot_script "${overlays[@]}"
     cp "${kernel_itb}" "${tftp_dir}"
 }
 
