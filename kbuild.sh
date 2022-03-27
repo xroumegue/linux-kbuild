@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: GPL-3.0
 
-set -e
+set -ex
 
 root_dir=$(dirname "$(realpath "$0")")
 
@@ -124,8 +124,8 @@ configs_dir=${configs_dir:-arch/${arch}/configs}
 v="${v:-0}"
 output_dir=${output_dir:-${kdir}}
 image_kernel=Image
-loadaddr=${loadaddr:-0x48080000}
-fdtaddr=${fdtaddr:-0x47000000}
+loadaddr=${loadaddr:-0x48000000}
+fdtaddr=${fdtaddr:-0x43000000}
 
 declare -a kargs
 kargs+=(-C "${kdir}")
@@ -187,17 +187,7 @@ function do_build {
     "${kdir}"/scripts/clang-tools/gen_compile_commands.py . "${modules_dir[@]}"
 }
 
-function do_install {
-    sudo=sudo
-    echo "Installing modules..."
-    ${sudo} make "${kargs[@]}" modules_install
-    for module_dir in "${modules_dir[@]}";
-    do
-        [ -d "${module_dir}" ] || fatal "${module_dir} does not exist!"
-        echo "Installing $module_dir..."
-        ${sudo} make "${kargs[@]}" M="${module_dir}" modules_install
-    done
-
+function do_install_tftp {
     echo "Copying ${platform} dtbs, ${image_kernel} to ${tftp_dir}"
 
     find \
@@ -208,14 +198,33 @@ function do_install {
     cp "${output_dir}/arch/${arch}/boot/${image_kernel}" "$tftp_dir/"
 
     # shellcheck disable=SC2034
-    read -r -a dtbs <<< "$(ls "${tftp_dir}"/*.dtb)"
-    # shellcheck disable=SC2034
-    read -r -a dt_overlays  <<< "$(ls "${tftp_dir}"/*.dtbo)"
+    mapfile -t dtbs < <(find "${tftp_dir}" -type f -name "*.dtb" | sort -r)
+    mapfile -t dt_overlays < <(find "${tftp_dir}" -type f -name "*.dtbo" | sort -r)
+
+    dtb_basename=$(basename "${dtbs[0]}" .dtb)
+    if [ "${dtb_basename}" != "${platform}" ]; then
+        platform=${dtb_basename}
+        echo "Inconsistent platform name, fixing to ${platform}"
+    fi
+    echo "${dtbs[@]}"
+    echo "${dt_overlays[@]}"
 
 	kernel_its=$output_dir/arch/$arch/boot/kernel_fdt.its
     kernel_itb=${kernel_its/its/itb}
     eval make_FIT_image "$kernel_its"
     cp "${kernel_itb}" "${tftp_dir}"
+}
+
+function do_install {
+    sudo=sudo
+    echo "Installing modules..."
+    ${sudo} make "${kargs[@]}" modules_install
+    for module_dir in "${modules_dir[@]}";
+    do
+        [ -d "${module_dir}" ] || fatal "${module_dir} does not exist!"
+        echo "Installing $module_dir..."
+        ${sudo} make "${kargs[@]}" M="${module_dir}" modules_install
+    done
 
     if [ -d "${sysroot_dir}" ]; then
         ${sudo} make "${kargs[@]}"  headers_install
@@ -237,10 +246,15 @@ do
             echo Installing...
             do_install
             ;;
+        "install_tftp")
+            echo Installing to tftp...
+            do_install_tftp
+            ;;
         "all")
             do_config
             do_build
             do_install
+            do_install_tftp
             ;;
         *)
             echo "Running $cmd..."
