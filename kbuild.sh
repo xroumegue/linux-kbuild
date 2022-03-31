@@ -121,6 +121,8 @@ done
 declare -a commands
 commands+=("${@:-all}")
 
+soc=${platform%%-*}
+board=${platform#*-}
 defconfig=${defconfig:-defconfig}
 arch=${arch:-arm64}
 kdir=${kdir:-$(pwd)}
@@ -192,11 +194,18 @@ function do_build {
 }
 
 function do_install_tftp {
-    echo "Copying ${platform} dtbs, ${image_kernel} to ${tftp_dir}"
+    echo "Copying ${platform} (soc:${soc} / board:${board}) dtbs, ${image_kernel} to ${tftp_dir}"
+
+    find "${tftp_dir}" -iname '*.dtb' -iname '*.dtbo' -delete
 
     find \
         "${output_dir}/arch/${arch}/boot/dts" \
-        -iname "${platform}*.dtb" \
+        -iname "${platform}.dtb" \
+        -exec cp {} "${tftp_dir}" \;
+
+    find \
+        "${output_dir}/arch/${arch}/boot/dts" \
+        -regex ".*${soc}-\(${board}-\)*[a-zA-Z0-9_]+-overlay.dtb" \
         -exec bash -c 'F=${1##*/}; cp $1 $2/${F/-overlay.dtb/.dtbo}' - '{}' "${tftp_dir}" \;
 
     cp "${output_dir}/arch/${arch}/boot/${image_kernel}" "$tftp_dir/"
