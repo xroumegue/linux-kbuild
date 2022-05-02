@@ -40,8 +40,8 @@ cat << EOF
 EOF
 }
 
-opts_short=vhN:T:M:K:S:f:C:c:p:O:o:
-opts_long=verbose,help,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,output-dir:,overlays:
+opts_short=vhD:N:T:M:K:S:f:C:c:p:O:o:
+opts_long=verbose,help,doc-dirs:,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,output-dir:,overlays:
 
 options=$(getopt -o ${opts_short} -l ${opts_long} -- "$@" )
 
@@ -108,6 +108,10 @@ while true; do
             shift
             cross_compile=$1
             ;;
+        --doc-dirs | -D)
+            shift
+            doc_dirs=$1
+            ;;
        --)
             shift
             break
@@ -132,6 +136,7 @@ output_dir=${output_dir:-${kdir}}
 image_kernel=Image
 loadaddr=${loadaddr:-0x48000000}
 fdtaddr=${fdtaddr:-0x43000000}
+doc_dirs=${doc_dirs:-$(pwd)}
 
 declare -a kargs
 kargs+=(-C "${kdir}")
@@ -139,6 +144,7 @@ kargs+=(-j"$(nproc)")
 kargs+=(ARCH="${arch}")
 kargs+=(V="${v}")
 kargs+=(INSTALL_MOD_PATH="${nfs_dir}")
+kargs+=(SPHINXDIRS="${doc_dirs}")
 if [ -d "${sysroot_dir}" ]; then
     kargs+=(INSTALL_HDR_PATH="${sysroot_dir}/usr/src/kernels")
 fi
@@ -191,6 +197,21 @@ function do_build {
     done
 
     "${kdir}"/scripts/clang-tools/gen_compile_commands.py . "${modules_dir[@]}"
+}
+
+function do_doc {
+	if [[ ! -f "$output_dir/doc/bin/activate" ]] ; then
+		python -m venv "$output_dir/doc"
+        # shellcheck disable=SC1091
+		. "$output_dir/doc/bin/activate"
+		pip install -r Documentation/sphinx/requirements.txt
+	else
+        # shellcheck disable=SC1091
+		. "$output_dir/doc/bin/activate"
+	fi
+
+    make "${kargs[@]}" htmldocs
+    deactivate
 }
 
 function do_install_tftp {
@@ -255,6 +276,10 @@ do
         "build")
             echo Building...
             do_build
+            ;;
+        "doc")
+            echo Generating documentation
+            do_doc
             ;;
         "install")
             echo Installing...
