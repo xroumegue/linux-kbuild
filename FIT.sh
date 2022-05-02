@@ -168,6 +168,7 @@ setenv nfsroot ${nfs_dir}
 setenv tftproot ${tftp_dir/\/srv\/tftp\//}
 setenv fdtconf ${platform}
 setenv image \${tftproot}/kernel_fdt.itb
+setenv extra_bootargs ${bootargs}
 
 setenv fdtconf_overlays "${conf_overlays[@]}"
 
@@ -179,7 +180,7 @@ done
 echo Loading kernel \${image} to \${loadaddr} ...;
 tftp \${loadaddr} \${serverip}:\${image}
 
-setenv bootargs console=\${console} root=/dev/nfs ip=dhcp nfsroot=\${serverip}:\${nfsroot},v3,tcp
+setenv bootargs console=\${console} root=/dev/nfs ip=dhcp nfsroot=\${serverip}:\${nfsroot},v3,tcp \${extra_bootargs}
 
 echo Booting ...;
 bootm \${loadaddr}#conf-\${fdtconf}\${overlaystring}
