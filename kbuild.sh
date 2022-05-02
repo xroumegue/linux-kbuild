@@ -37,11 +37,26 @@ cat << EOF
             The platform name, used for selecting the dtb to copy to tftp_dir
         --cross-compile, -c
             Set the cross compile environment variable. Use LLVM if not set.
+        --bootargs, -b
+            Set additional bootargs to kernel command line
+        --doc-dirs, -D
+            Specify the documentation folder to generate
+        --dt-bindings, -d
+            Check specified dt bindings file
+    Possible commands:
+        config
+        build
+        doc
+        install
+        install_tftp
+        dt_check
+        all
+
 EOF
 }
 
-opts_short=vhb:D:N:T:M:K:S:f:C:c:p:O:o:
-opts_long=verbose,help,bootargs:,doc-dirs:,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,output-dir:,overlays:
+opts_short=vhb:D:N:T:M:K:S:f:C:c:p:O:o:d:
+opts_long=verbose,help,bootargs:,doc-dirs:,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,output-dir:,overlays:,dt-bindings:
 
 options=$(getopt -o ${opts_short} -l ${opts_long} -- "$@" )
 
@@ -116,6 +131,10 @@ while true; do
             shift
             doc_dirs=$1
             ;;
+        --dt-bindings | -d)
+            shift
+            dt_bindings=$1
+            ;;
        --)
             shift
             break
@@ -142,6 +161,7 @@ loadaddr=${loadaddr:-0x48000000}
 fdtaddr=${fdtaddr:-0x43000000}
 doc_dirs=${doc_dirs:-$(pwd)}
 bootargs=${bootargs:-}
+dt_bindings=${dt_bindings:-}
 
 declare -a kargs
 kargs+=(-C "${kdir}")
@@ -150,6 +170,12 @@ kargs+=(ARCH="${arch}")
 kargs+=(V="${v}")
 kargs+=(INSTALL_MOD_PATH="${nfs_dir}")
 kargs+=(SPHINXDIRS="${doc_dirs}")
+kargs+=(DT_CHECKER_FLAGS="-m")
+if [ -n "${dt_bindings}" ];
+then
+kargs+=(DT_SCHEMA_FILES="${dt_bindings}")
+fi
+
 if [ -d "${sysroot_dir}" ]; then
     kargs+=(INSTALL_HDR_PATH="${sysroot_dir}/usr/src/kernels")
 fi
@@ -219,6 +245,10 @@ function do_doc {
     deactivate
 }
 
+function do_dt_check {
+    make "${kargs[@]}" dt_binding_check
+}
+
 function do_install_tftp {
     echo "Copying ${platform} (soc:${soc} / board:${board}) dtbs, ${image_kernel} to ${tftp_dir}"
 
@@ -285,6 +315,10 @@ do
         "doc")
             echo Generating documentation
             do_doc
+            ;;
+        "dt_check")
+            echo Checking dt bindings
+            do_dt_check
             ;;
         "install")
             echo Installing...
