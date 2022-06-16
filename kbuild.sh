@@ -159,7 +159,7 @@ output_dir=${output_dir:-${kdir}}
 image_kernel=Image
 loadaddr=${loadaddr:-0x48000000}
 fdtaddr=${fdtaddr:-0x43000000}
-doc_dirs=${doc_dirs:-$(pwd)}
+doc_dirs=${doc_dirs:-.}
 bootargs=${bootargs:-}
 dt_bindings=${dt_bindings:-}
 
