@@ -247,6 +247,7 @@ function do_doc {
 
 function do_dt_check {
     make "${kargs[@]}" dt_binding_check
+    make "${kargs[@]}" refcheckdocs
 }
 
 function do_install_tftp {
