@@ -123,6 +123,9 @@ kdir=${kdir:-$(pwd)}
 configs_dir=${configs_dir:-arch/${arch}/configs}
 v="${v:-0}"
 output_dir=${output_dir:-${kdir}}
+image_kernel=Image
+loadaddr=${loadaddr:-0x48080000}
+fdtaddr=${fdtaddr:-0x47000000}
 
 declare -a kargs
 kargs+=(-C "${kdir}")
@@ -141,22 +144,29 @@ else
     kargs+=(CROSS_COMPILE="${cross_compile}")
 fi
 
-if [ ${output_dir} != ${kdir} ];
+if [ "${output_dir}" != "${kdir}" ];
 then
-    [ -d ${output_dir} ] || mkdir -p ${output_dir}
+    [ -d "${output_dir}" ] || mkdir -p "${output_dir}"
     kargs+=(O="${output_dir}")
 fi
 
 [ -d "${nfs_dir}" ] || fatal "${nfs_dir} does not exist!"
 [ -d "${tftp_dir}" ] || fatal "${tftp_dir} does not exist!"
 
+# shellcheck source="${root_dir}"/FIT.sh
+# shellcheck disable=SC1091
+. "${root_dir}"/FIT.sh || fatal "Sourcing FIT.sh returned with error!"
+
 function do_config {
     force=${1:-notforce}
-    if [ ! -e ${output_dir}/.config ] || [ "${force}" == "force" ];
+    if [ ! -e "${output_dir}"/.config ] || [ "${force}" == "force" ];
     then
         if [ ${#fragments[@]} -gt 0 ];
         then
-            "${kdir}"/scripts/kconfig/merge_config.sh -O ${output_dir} -m "arch/${arch}/configs/${defconfig}" "$(printf "${configs_dir}/%s " "${fragments[@]}")"
+            "${kdir}"/scripts/kconfig/merge_config.sh \
+                -O "${output_dir}" \
+                -m "arch/${arch}/configs/${defconfig}" \
+                "$(printf "${configs_dir}/%s " "${fragments[@]}")"
             make "${kargs[@]}" olddefconfig
         else
             make "${kargs[@]}" "${defconfig}"
@@ -165,7 +175,7 @@ function do_config {
 }
 
 function do_build {
-    make "${kargs[@]}" Image dtbs modules
+    make "${kargs[@]}" "${image_kernel}" dtbs modules
     for module_dir in "${modules_dir[@]}";
     do
 
@@ -188,14 +198,24 @@ function do_install {
         ${sudo} make "${kargs[@]}" M="${module_dir}" modules_install
     done
 
-    echo "Copying ${platform}  dtbs, Image to ${tftp_dir}"
+    echo "Copying ${platform} dtbs, ${image_kernel} to ${tftp_dir}"
 
     find \
         "${output_dir}/arch/${arch}/boot/dts" \
         -iname "${platform}*.dtb" \
         -exec bash -c 'F=${1##*/}; cp $1 $2/${F/-overlay.dtb/.dtbo}' - '{}' "${tftp_dir}" \;
 
-    cp "${output_dir}/arch/${arch}/boot/Image" "$tftp_dir/"
+    cp "${output_dir}/arch/${arch}/boot/${image_kernel}" "$tftp_dir/"
+
+    # shellcheck disable=SC2034
+    read -r -a dtbs <<< "$(ls "${tftp_dir}"/*.dtb)"
+    # shellcheck disable=SC2034
+    read -r -a dt_overlays  <<< "$(ls "${tftp_dir}"/*.dtbo)"
+
+	kernel_its=$output_dir/arch/$arch/boot/kernel_fdt.its
+    kernel_itb=${kernel_its/its/itb}
+    eval make_FIT_image "$kernel_its"
+    cp "${kernel_itb}" "${tftp_dir}"
 
     if [ -d "${sysroot_dir}" ]; then
         ${sudo} make "${kargs[@]}"  headers_install
