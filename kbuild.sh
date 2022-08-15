@@ -40,8 +40,8 @@ cat << EOF
 EOF
 }
 
-opts_short=vhD:N:T:M:K:S:f:C:c:p:O:o:
-opts_long=verbose,help,doc-dirs:,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,output-dir:,overlays:
+opts_short=vhb:D:N:T:M:K:S:f:C:c:p:O:o:
+opts_long=verbose,help,bootargs:,doc-dirs:,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,output-dir:,overlays:
 
 options=$(getopt -o ${opts_short} -l ${opts_long} -- "$@" )
 
@@ -61,6 +61,10 @@ while true; do
         --help | -h)
             usage
             exit 0
+            ;;
+        --bootargs | -b)
+            shift
+            bootargs=$1
             ;;
         --output-dir | -O)
             shift
@@ -137,6 +141,7 @@ image_kernel=Image
 loadaddr=${loadaddr:-0x48000000}
 fdtaddr=${fdtaddr:-0x43000000}
 doc_dirs=${doc_dirs:-$(pwd)}
+bootargs=${bootargs:-}
 
 declare -a kargs
 kargs+=(-C "${kdir}")

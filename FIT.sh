@@ -179,7 +179,7 @@ done
 echo Loading kernel \${image} to \${loadaddr} ...;
 tftp \${loadaddr} \${serverip}:\${image}
 
-setenv bootargs console=\${console} root=/dev/nfs ip=dhcp nfsroot=\${serverip}:\${nfsroot},v3,tcp
+setenv bootargs console=\${console} root=/dev/nfs ip=dhcp nfsroot=\${serverip}:\${nfsroot},v3,tcp ${bootargs}
 
 echo Booting ...;
 bootm \${loadaddr}#conf-\${fdtconf}\${overlaystring}
