@@ -4,11 +4,11 @@
 
 set -e
 
-ROOT_DIR=$(dirname "$(realpath "$0")")
+root_dir=$(dirname "$(realpath "$0")")
 
-# shellcheck source="${ROOT_DIR}/helpers.sh"
+# shellcheck source="${root_dir}/helpers.sh"
 # shellcheck disable=SC1091
-. "${ROOT_DIR}/helpers.sh"
+. "${root_dir}/helpers.sh"
 
 function usage {
 cat << EOF
@@ -32,16 +32,16 @@ cat << EOF
         --fragments-config, -f
             A list of config fragment files separated with ','
         --platform, -p
-            The platform name, used for selecting the dtb to copy to TFTP_DIR
+            The platform name, used for selecting the dtb to copy to tftp_dir
         --cross-compile, -c
             Set the cross compile environment variable. Use LLVM if not set.
 EOF
 }
 
-OPTS_SHORT=vhN:T:M:K:S:f:C:c:p:
-OPTS_LONG=verbose,help,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:
+opts_short=vhN:T:M:K:S:f:C:c:p:
+opts_long=verbose,help,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:
 
-options=$(getopt -o ${OPTS_SHORT} -l ${OPTS_LONG} -- "$@" )
+options=$(getopt -o ${opts_short} -l ${opts_long} -- "$@" )
 
 # shellcheck disable=SC2181
 [ $? -eq 0 ] || {
@@ -54,7 +54,7 @@ eval set -- "$options"
 while true; do
     case "$1" in
         --verbose | -v)
-            V=1
+            v=1
             ;;
         --help | -h)
             usage
@@ -62,41 +62,41 @@ while true; do
             ;;
         --nfs-dir | -N)
             shift
-            NFS_DIR=$1
+            nfs_dir=$1
             ;;
         --sysroot-dir | -S)
             shift
-            SYSROOT_DIR=$1
+            sysroot_dir=$1
             ;;
         --tftp-dir | -T)
             shift
-            TFTP_DIR=$1
+            tftp_dir=$1
             ;;
         --modules-dir | -M)
             shift
-            IFS=',' read -r -a MODULES_DIR <<< "$1"
+            IFS=',' read -r -a modules_dir <<< "$1"
             unset IFS
             ;;
         --kernel-dir | -K)
             shift
-            KDIR=$1
+            kdir=$1
             ;;
         --configs-dir | -C)
             shift
-            CONFIGS_DIR=$1
+            configs_dir=$1
             ;;
         --fragments-config | -f)
             shift
-            IFS=',' read -r -a FRAGMENTS <<< "$1"
+            IFS=',' read -r -a fragments <<< "$1"
             unset IFS
             ;;
         --platform | -p)
             shift
-            PLATFORM=$1
+            platform=$1
             ;;
         --cross-compile | -c)
             shift
-            CROSS_COMPILE=$1
+            cross_compile=$1
             ;;
        --)
             shift
@@ -108,92 +108,90 @@ while true; do
     shift
 done
 
-declare -a COMMANDS
-COMMANDS+=("${@:-all}")
+declare -a commands
+commands+=("${@:-all}")
 
-DEFCONFIG=${DEFCONFIG:-defconfig}
-NPROC=$(nproc)
-ARCH=${ARCH:-arm64}
-KDIR=${KDIR:-$(pwd)}
-CONFIGS_DIR=${CONFIGS_DIR:-arch/${ARCH}/configs}
-V="${V:-0}"
+defconfig=${defconfig:-defconfig}
+arch=${arch:-arm64}
+kdir=${kdir:-$(pwd)}
+configs_dir=${configs_dir:-arch/${arch}/configs}
+v="${v:-0}"
 
-declare -a KARGS
-KARGS+=(-C "${KDIR}")
-KARGS+=(-j"${NPROC}")
-KARGS+=(ARCH="${ARCH}")
-KARGS+=(V="${V}")
-KARGS+=(INSTALL_MOD_PATH="${NFS_DIR}")
-if [ -d "${SYSROOT_DIR}" ]; then
-    KARGS+=(INSTALL_HDR_PATH="${SYSROOT_DIR}/usr/src/kernels")
+declare -a kargs
+kargs+=(-C "${kdir}")
+kargs+=(-j"$(nproc)")
+kargs+=(ARCH="${arch}")
+kargs+=(V="${v}")
+kargs+=(INSTALL_MOD_PATH="${nfs_dir}")
+if [ -d "${sysroot_dir}" ]; then
+    kargs+=(INSTALL_HDR_PATH="${sysroot_dir}/usr/src/kernels")
 fi
 
-if [ -z "${CROSS_COMPILE}" ];
+if [ -z "${cross_compile}" ];
 then
-    KARGS+=(LLVM=1)
+    kargs+=(LLVM=1)
 else
-    KARGS+=(CROSS_COMPILE="${CROSS_COMPILE}")
+    kargs+=(CROSS_COMPILE="${cross_compile}")
 fi
 
-[ -d "${NFS_DIR}" ] || fatal "${NFS_DIR} does not exist!"
-[ -d "${TFTP_DIR}" ] || fatal "${TFTP_DIR} does not exist!"
-
+[ -d "${nfs_dir}" ] || fatal "${nfs_dir} does not exist!"
+[ -d "${tftp_dir}" ] || fatal "${tftp_dir} does not exist!"
 
 function do_config {
-    FORCE=${1:-notforce}
-    if [ ! -e .config ] || [ "${FORCE}" == "force" ];
+    force=${1:-notforce}
+    if [ ! -e .config ] || [ "${force}" == "force" ];
     then
-        if [ ${#FRAGMENTS[@]} -gt 0 ];
+        if [ ${#fragments[@]} -gt 0 ];
         then
-            "${KDIR}"/scripts/kconfig/merge_config.sh -m "arch/${ARCH}/configs/${DEFCONFIG}" "$(printf "${CONFIGS_DIR}/%s " "${FRAGMENTS[@]}")"
-            make "${KARGS[@]}" olddefconfig
+            "${kdir}"/scripts/kconfig/merge_config.sh -m "arch/${arch}/configs/${defconfig}" "$(printf "${configs_dir}/%s " "${fragments[@]}")"
+            make "${kargs[@]}" olddefconfig
         else
-            make "${KARGS[@]}" "${DEFCONFIG}"
+            make "${kargs[@]}" "${defconfig}"
         fi
     fi
 }
 
 function do_build {
-    make "${KARGS[@]}" Image dtbs modules
-    for MODULE_DIR in "${MODULES_DIR[@]}";
+    make "${kargs[@]}" Image dtbs modules
+    for module_dir in "${modules_dir[@]}";
     do
 
-        [ -d "${MODULE_DIR}" ] || fatal "${MODULE_DIR} does not exist!"
-        echo "Compiling $MODULE_DIR..."
-        make "${KARGS[@]}" M="${MODULE_DIR}" clean modules
+        [ -d "${module_dir}" ] || fatal "${module_dir} does not exist!"
+        echo "Compiling $module_dir..."
+        make "${kargs[@]}" M="${module_dir}" clean modules
     done
 
-    "${KDIR}"/scripts/clang-tools/gen_compile_commands.py . "${MODULES_DIR[@]}"
+    "${kdir}"/scripts/clang-tools/gen_compile_commands.py . "${modules_dir[@]}"
 }
 
 function do_install {
-    SUDO=sudo
+    sudo=sudo
     echo "Installing modules..."
-    ${SUDO} make "${KARGS[@]}" modules_install
-    for MODULE_DIR in "${MODULES_DIR[@]}";
+    ${sudo} make "${kargs[@]}" modules_install
+    for module_dir in "${modules_dir[@]}";
     do
-        [ -d "${MODULE_DIR}" ] || fatal "${MODULE_DIR} does not exist!"
-        echo "Installing $MODULE_DIR..."
-        ${SUDO} make "${KARGS[@]}" M="${MODULE_DIR}" modules_install
+        [ -d "${module_dir}" ] || fatal "${module_dir} does not exist!"
+        echo "Installing $module_dir..."
+        ${sudo} make "${kargs[@]}" M="${module_dir}" modules_install
     done
 
-    echo "Copying ${PLATFORM}  dtbs, Image to ${TFTP_DIR}"
+    echo "Copying ${platform}  dtbs, Image to ${tftp_dir}"
 
     find \
-        "arch/${ARCH}/boot/dts" \
-        -iname "${PLATFORM}*.dtb" \
-        -exec bash -c 'F=${1##*/}; cp $1 $2/${F/-overlay.dtb/.dtbo}' - '{}' "${TFTP_DIR}" \;
+        "arch/${arch}/boot/dts" \
+        -iname "${platform}*.dtb" \
+        -exec bash -c 'F=${1##*/}; cp $1 $2/${F/-overlay.dtb/.dtbo}' - '{}' "${tftp_dir}" \;
 
-    cp "arch/${ARCH}/boot/Image" "$TFTP_DIR/"
+    cp "arch/${arch}/boot/Image" "$tftp_dir/"
 
-    if [ -d "${SYSROOT_DIR}" ]; then
-        sudo make "${KARGS[@]}"  headers_install
+    if [ -d "${sysroot_dir}" ]; then
+        sudo make "${kargs[@]}"  headers_install
     fi
 }
 
-for CMD in "${COMMANDS[@]}";
+for cmd in "${commands[@]}";
 do
-    case "$CMD" in
+    case "$cmd" in
         "config")
             echo Configuring the kernel ...
             do_config force
@@ -212,8 +210,8 @@ do
             do_install
             ;;
         *)
-            echo "Running $CMD..."
-            make "${KARGS[@]}" "$CMD"
+            echo "Running $cmd..."
+            make "${kargs[@]}" "$cmd"
             ;;
     esac
 done
