@@ -150,3 +150,38 @@ EOF
 	PATH="$output_dir/scripts/dtc:$PATH" mkimage -f "$kernel_its" "${kernel_its/its/itb}"
 }
 
+
+
+make_FIT_boot_script() {
+    local boot_FIT
+    local conf_overlays=("$@")
+    boot_FIT=$tftp_dir/boot_fit
+    cat <<EOF > "${boot_FIT}.cmd"
+setenv nfsroot ${nfs_dir}
+setenv tftproot ${tftp_dir/\/srv\/tftp\//}
+setenv fdtconf ${platform}
+setenv image \${tftproot}/kernel_fdt.itb
+
+setenv fdtconf_overlays "${conf_overlays[@]}"
+
+for overlay in \${fdtconf_overlays}; do
+    echo Overlaying \${overlay}...;
+    setenv overlaystring "\${overlaystring}\\#conf-\${overlay}"
+done
+
+echo Loading kernel \${image} to \${loadaddr} ...;
+tftp \${loadaddr} \${serverip}:\${image}
+
+setenv bootargs console=\${console} root=/dev/nfs ip=dhcp nfsroot=\${serverip}:\${nfsroot},v3,tcp
+
+echo Booting ...;
+bootm \${loadaddr}#conf-\${fdtconf}\${overlaystring}
+EOF
+
+    mkimage \
+        -A arm \
+        -T script \
+        -C none \
+        -n "${platform} boot script" \
+        -d "${boot_FIT}.cmd" "${boot_FIT}.scr"
+}
