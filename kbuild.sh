@@ -179,9 +179,12 @@ function do_install {
 
     echo "Copying ${PLATFORM}  dtbs, Image to ${TFTP_DIR}"
 
-    DTBS=$(find "arch/${ARCH}" -iname "${PLATFORM}*.dtb")
+    find \
+        "arch/${ARCH}/boot/dts" \
+        -iname "${PLATFORM}*.dtb" \
+        -exec bash -c 'F=${1##*/}; cp $1 $2/${F/-overlay.dtb/.dtbo}' - '{}' "${TFTP_DIR}" \;
 
-    cp "${DTBS}" "arch/${ARCH}/boot/Image" "$TFTP_DIR/"
+    cp "arch/${ARCH}/boot/Image" "$TFTP_DIR/"
 
     if [ -d "${SYSROOT_DIR}" ]; then
         sudo make "${KARGS[@]}"  headers_install
