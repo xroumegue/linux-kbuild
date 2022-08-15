@@ -213,7 +213,7 @@ function do_install_tftp {
     echo "${dtbs[@]}"
     echo "${dt_overlays[@]}"
 
-	kernel_its=$output_dir/arch/$arch/boot/kernel_fdt.its
+    kernel_its=$output_dir/arch/$arch/boot/kernel_fdt.its
     kernel_itb=${kernel_its/its/itb}
     eval make_FIT_image "$kernel_its"
     eval make_FIT_boot_script "${overlays[@]}"
