@@ -8,10 +8,17 @@ fi
 get_dtb_feature() {
     local dtb_feature
     dtb_feature=$(basename "${1}" "$2")
-    if [ -n "${dtb_feature/$platform-/}" ]; then
-        dtb_feature=${dtb_feature/$platform-/}
-    fi
-    echo "${dtb_feature}"
+    case $dtb_feature in
+        ${platform}-*)
+            echo "${dtb_feature/$platform-/}"
+            ;;
+        ${soc}-*)
+            echo "${dtb_feature/$soc-/}"
+            ;;
+        *)
+            echo "${dtb_feature}"
+            ;;
+    esac
 }
 
 get_fdt_name() {
