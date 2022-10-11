@@ -231,15 +231,15 @@ function do_build {
 }
 
 function do_doc {
-	if [[ ! -f "$output_dir/doc/bin/activate" ]] ; then
-		python -m venv "$output_dir/doc"
+    if [[ ! -f "$output_dir/doc/bin/activate" ]] ; then
+        python -m venv "$output_dir/doc"
         # shellcheck disable=SC1091
-		. "$output_dir/doc/bin/activate"
-		pip install -r Documentation/sphinx/requirements.txt
-	else
+        . "$output_dir/doc/bin/activate"
+        pip install -r Documentation/sphinx/requirements.txt
+    else
         # shellcheck disable=SC1091
-		. "$output_dir/doc/bin/activate"
-	fi
+        . "$output_dir/doc/bin/activate"
+    fi
 
     make "${kargs[@]}" htmldocs
     deactivate
