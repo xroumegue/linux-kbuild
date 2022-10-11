@@ -288,6 +288,8 @@ function do_install_tftp {
 
 function do_install {
     sudo=sudo
+    echo "Pruning previous modules installation"
+    ${sudo} find "${nfs_dir}"/lib/modules/ -mindepth 1 -maxdepth 1 -type d -exec rm -Rf {} \;
     echo "Installing modules..."
     ${sudo} make "${kargs[@]}" modules_install
     for module_dir in "${modules_dir[@]}";
