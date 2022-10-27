@@ -164,6 +164,7 @@ bootargs=${bootargs:-}
 dt_bindings=${dt_bindings:-}
 
 declare -a kargs
+kargs+=(DTC_FLAGS=-@)
 kargs+=(-C "${kdir}")
 kargs+=(-j"$(nproc)")
 kargs+=(ARCH="${arch}")
