@@ -254,7 +254,7 @@ function do_dt_check {
 function do_install_tftp {
     echo "Copying ${platform} (soc:${soc} / board:${board}) dtbs, ${image_kernel} to ${tftp_dir}"
 
-    find "${tftp_dir}" -iname '*.dtb' -iname '*.dtbo' -delete
+    find "${tftp_dir}" -regex '.*\.dtb[o]*' -delete
 
     find \
         "${output_dir}/arch/${arch}/boot/dts" \
@@ -265,6 +265,17 @@ function do_install_tftp {
         "${output_dir}/arch/${arch}/boot/dts" \
         -regex ".*${soc}-\(${board}-\)*[a-zA-Z0-9_]+-overlay.dtb" \
         -exec bash -c 'F=${1##*/}; cp $1 $2/${F/-overlay.dtb/.dtbo}' - '{}' "${tftp_dir}" \;
+
+    find \
+        "${output_dir}/arch/${arch}/boot/dts" \
+        -regex ".*${soc}-[a-zA-Z0-9_]+.dtbo" \
+        -exec cp {} "${tftp_dir}" \;
+
+    find \
+        "${output_dir}/arch/${arch}/boot/dts" \
+        -regex ".*${soc}-${board}-[a-zA-Z0-9_-]+.dtbo" \
+		-print \
+        -exec cp {} "${tftp_dir}" \;
 
     cp "${output_dir}/arch/${arch}/boot/${image_kernel}" "$tftp_dir/"
 
