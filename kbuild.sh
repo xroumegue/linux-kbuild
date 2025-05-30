@@ -21,10 +21,14 @@ cat << EOF
             Specify the output directory
         --nfs-dir, -N
             Specify the NFS directory exporting the root file system
+        --nfs-server, -s
+            Specify the NFS server ip
         --sysroot-dir, -S
             Specify the sysroot directory
         --tftp-dir, -T
             Specify the TFTP directory exporting the boot images
+        --pxe-dir, -P
+            Specify the PXE directory exporting the PXE boot images
         --modules-dir, -M
             A list of modules directory separated with ','
         --kernel-dir, -K
@@ -55,8 +59,8 @@ cat << EOF
 EOF
 }
 
-opts_short=vhb:D:N:T:M:K:S:f:C:c:p:O:o:d:
-opts_long=verbose,help,bootargs:,doc-dirs:,nfs-dir:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,output-dir:,overlays:,dt-bindings:
+opts_short=vhb:D:N:s:T:M:K:S:f:C:c:p:P:O:o:d:
+opts_long=verbose,help,bootargs:,doc-dirs:,nfs-dir:,nfs-server:,tftp-dir:,modules-dir:,kernel-dir:,sysroot-dir:,fragments-config:,configs-dir:,cross-compile:,platform:,pxe-file:,output-dir:,overlays:,dt-bindings:
 
 options=$(getopt -o ${opts_short} -l ${opts_long} -- "$@" )
 
@@ -89,6 +93,10 @@ while true; do
             shift
             nfs_dir=$1
             ;;
+        --nfs-server | -s)
+            shift
+            nfs_server=$1
+            ;;
         --sysroot-dir | -S)
             shift
             sysroot_dir=$1
@@ -101,6 +109,10 @@ while true; do
             shift
             IFS=',' read -r -a modules_dir <<< "$1"
             unset IFS
+            ;;
+        --pxe-file | -P)
+            shift
+            pxe_file=$1
             ;;
         --kernel-dir | -K)
             shift
@@ -162,6 +174,7 @@ fdtaddr=${fdtaddr:-0x43000000}
 doc_dirs=${doc_dirs:-.}
 bootargs=${bootargs:-}
 dt_bindings=${dt_bindings:-}
+nfs_server=${nfs_server:-${NFS_SERVER_IP}}
 
 declare -a kargs
 kargs+=(DTC_FLAGS=-@)
@@ -251,6 +264,60 @@ function do_dt_check {
     make "${kargs[@]}" refcheckdocs
 }
 
+
+function _do_install_pxe {
+    if [ ! -n "${pxe_file+x}" ];then
+        echo pxe file is not defined, skipping!
+        return
+    fi
+    tftp_root=$(dirname $(dirname "${pxe_file}"))
+    echo "tftp root ${tftp_root}"
+    overlay_prefix=${tftp_dir#"${tftp_root}/"}
+    pxe_root=${platform}
+
+    fdtoverlays=()
+    for item in "${overlays[@]}";
+    do
+        fdtoverlays+=($(find ${output_dir}/arch/${arch}/boot/dts -type f -name "${soc}-${item}.dtbo" -exec basename {} \;))
+        fdtoverlays+=($(find ${output_dir}/arch/${arch}/boot/dts -type f -name "${platform}-${item}.dtbo" -exec basename {} \;))
+    done
+
+    fdtoverlay_str=""
+    for overlay in "${fdtoverlays[@]}";
+    do
+        fdtoverlay_str+="${overlay_prefix}/${overlay} "
+    done
+
+    fdtfile_str="${overlay_prefix}/${platform}.dtb"
+    kernel_str="${overlay_prefix}/${image_kernel}"
+
+    nfsroot_str=""
+    ip_str=""
+    if [ -z "${nfs_server}" ];then
+        ipappend=1
+    else
+        nfsroot_str+=${nfs_server}:
+        ipappend=0
+        ip_str="ip=dhcp"
+    fi
+    nfsroot_str+=${nfs_dir},tcp,nolock
+
+cat >"${pxe_file}" <<EOF
+prompt 0
+timeout 10
+default nfsboot
+
+menu title Select the boot mode
+
+label nfsboot
+	fdt         ${fdtfile_str}
+	fdtoverlays ${fdtoverlay_str}
+	kernel      ${kernel_str}
+	append root=/dev/nfs nfsroot=${nfsroot_str} rw ${ip_str} ${bootargs}
+	ipappend ${ipappend}
+EOF
+}
+
 function do_install_tftp {
     echo "Copying ${platform} (soc:${soc} / board:${board}) dtbs, ${image_kernel} to ${tftp_dir}"
 
@@ -295,6 +362,7 @@ function do_install_tftp {
     kernel_itb=${kernel_its/its/itb}
     eval make_FIT_image "$kernel_its"
     eval make_FIT_boot_script "${overlays[@]}"
+    _do_install_pxe
     cp "${kernel_itb}" "${tftp_dir}"
 }
 
